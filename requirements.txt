@@ -1,0 +1,20 @@
+# Gmail API
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.100.0
+
+# Database
+influxdb>=5.3.1
+
+# Data processing
+pandas>=2.0.0
+python-dateutil>=2.8.2
+
+# Ollama integration
+requests>=2.31.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Utilities
+pytz>=2023.3
