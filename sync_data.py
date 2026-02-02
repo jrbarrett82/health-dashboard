@@ -74,20 +74,28 @@ def main():
         
         # Step 4: Parse and store data
         print("[4/4] Parsing CSV data and storing in database...")
-        nutrition_data = parser.parse_multiple_csvs(csv_files)
+        nutrition_data, food_entries = parser.parse_multiple_csvs(csv_files, extract_foods=True)
         
         if not nutrition_data:
             print("✗ No data parsed from CSV files")
             return 1
         
-        # Write to database
+        # Write daily nutrition data to database
         success = db.batch_write_nutrition(nutrition_data)
+        
+        # Write individual food entries to database
+        if food_entries:
+            food_success = db.batch_write_food_entries(food_entries)
+            if not food_success:
+                print("⚠ Warning: Failed to write some food entries")
         
         if success:
             print()
             print("=" * 60)
             print("✓ Sync completed successfully!")
             print(f"  Total days synced: {len(nutrition_data)}")
+            if food_entries:
+                print(f"  Total food entries: {len(food_entries)}")
             
             # Show date range
             if nutrition_data:

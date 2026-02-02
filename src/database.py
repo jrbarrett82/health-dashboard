@@ -169,6 +169,128 @@ class HealthDatabase:
             print(f"Error getting latest date: {e}")
             return None
     
+    def write_food_entry(self, food_data: Dict) -> bool:
+        """
+        Write individual food entry to InfluxDB.
+        
+        Args:
+            food_data: Dictionary with date, food_name, and nutrition data
+        """
+        if not self.client:
+            raise RuntimeError("Database not connected. Call connect() first.")
+        
+        date = food_data.get('date')
+        if isinstance(date, str):
+            date = datetime.fromisoformat(date)
+        
+        point = {
+            "measurement": "food_entries",
+            "time": date.isoformat(),
+            "tags": {
+                "food_name": food_data.get('food_name', 'Unknown')
+            },
+            "fields": {
+                "quantity": str(food_data.get('quantity', '')),
+                "calories": float(food_data.get('calories', 0)),
+                "protein_g": float(food_data.get('protein_g', 0)),
+                "carbs_g": float(food_data.get('carbs_g', 0)),
+                "fat_g": float(food_data.get('fat_g', 0)),
+                "sodium_mg": float(food_data.get('sodium_mg', 0)),
+                "sugar_g": float(food_data.get('sugar_g', 0)),
+                "fiber_g": float(food_data.get('fiber_g', 0)),
+            }
+        }
+        
+        try:
+            self.client.write_points([point])
+            return True
+        except Exception as e:
+            print(f"Error writing food entry to InfluxDB: {e}")
+            return False
+    
+    def batch_write_food_entries(self, entries: List[Dict]) -> bool:
+        """
+        Write multiple food entries in batch.
+        
+        Args:
+            entries: List of food entry dicts
+        """
+        if not self.client:
+            raise RuntimeError("Database not connected. Call connect() first.")
+        
+        points = []
+        for entry in entries:
+            date = entry.get('date')
+            if isinstance(date, str):
+                date = datetime.fromisoformat(date)
+            
+            point = {
+                "measurement": "food_entries",
+                "time": date.isoformat(),
+                "tags": {
+                    "food_name": entry.get('food_name', 'Unknown')
+                },
+                "fields": {
+                    "quantity": str(entry.get('quantity', '')),
+                    "calories": float(entry.get('calories', 0)),
+                    "protein_g": float(entry.get('protein_g', 0)),
+                    "carbs_g": float(entry.get('carbs_g', 0)),
+                    "fat_g": float(entry.get('fat_g', 0)),
+                    "sodium_mg": float(entry.get('sodium_mg', 0)),
+                    "sugar_g": float(entry.get('sugar_g', 0)),
+                    "fiber_g": float(entry.get('fiber_g', 0)),
+                }
+            }
+            points.append(point)
+        
+        try:
+            self.client.write_points(points)
+            print(f"✓ Wrote {len(points)} food entries to database")
+            return True
+        except Exception as e:
+            print(f"✗ Error batch writing food entries to InfluxDB: {e}")
+            return False
+    
+    def query_top_foods(self, limit: int = 20, days: int = 30) -> List[Dict]:
+        """
+        Query most frequently eaten foods.
+        
+        Args:
+            limit: Number of top foods to return
+            days: Look back period in days
+            
+        Returns:
+            List of foods with counts and avg nutrition
+        """
+        if not self.client:
+            raise RuntimeError("Database not connected. Call connect() first.")
+        
+        query = f"""
+        SELECT COUNT(calories) as count, 
+               MEAN(calories) as avg_calories,
+               MEAN(sodium_mg) as avg_sodium
+        FROM food_entries 
+        WHERE time > now() - {days}d
+        GROUP BY food_name 
+        ORDER BY count DESC 
+        LIMIT {limit}
+        """
+        
+        try:
+            result = self.client.query(query)
+            foods = []
+            for point in result.get_points():
+                foods.append({
+                    'food_name': point.get('food_name'),
+                    'count': int(point.get('count', 0)),
+                    'avg_calories': round(point.get('avg_calories', 0), 1),
+                    'avg_sodium': round(point.get('avg_sodium', 0), 1)
+                })
+            return foods
+        except Exception as e:
+            print(f"Error querying top foods: {e}")
+            return []
+    
     def close(self):
         """Close database connection."""
         if self.client:

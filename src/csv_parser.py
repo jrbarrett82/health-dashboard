@@ -9,15 +9,17 @@ from dateutil import parser as date_parser
 class LoseItCSVParser:
     """Parses Lose It! CSV exports and aggregates nutrition data by day."""
     
-    def parse_csv(self, csv_data: bytes) -> List[Dict]:
+    def parse_csv(self, csv_data: bytes, extract_foods: bool = False) -> tuple:
         """
         Parse CSV data from Lose It! export.
         
         Args:
             csv_data: Raw CSV file content as bytes
+            extract_foods: If True, also return individual food entries
             
         Returns:
-            List of daily aggregated nutrition data
+            If extract_foods=False: (daily_data, [])
+            If extract_foods=True: (daily_data, food_entries)
         """
         # Decode CSV data
         csv_text = csv_data.decode('utf-8')
@@ -25,8 +27,9 @@ class LoseItCSVParser:
         
         reader = csv.DictReader(csv_file)
         
-        # Aggregate by day
+        # Aggregate by day and optionally collect food entries
         days = {}
+        food_entries = []
         
         for row in reader:
             if not row.get('Date'):
@@ -59,25 +62,55 @@ class LoseItCSVParser:
             # Add food/nutrition data
             if row.get('Calories'):
                 try:
-                    days[date_key]['calories'] += self._parse_number(row.get('Calories', 0))
-                    days[date_key]['protein_g'] += self._parse_number(
+                    calories = self._parse_number(row.get('Calories', 0))
+                    protein_g = self._parse_number(
                         row.get('Protein (g)') or row.get('Protein(g)', 0)
                     )
-                    days[date_key]['carbs_g'] += self._parse_number(
+                    carbs_g = self._parse_number(
                         row.get('Carbohydrates (g)') or row.get('Carbohydrates(g)', 0)
                     )
-                    days[date_key]['fat_g'] += self._parse_number(
+                    fat_g = self._parse_number(
                         row.get('Fat (g)') or row.get('Fat(g)', 0)
                     )
-                    days[date_key]['sodium_mg'] += self._parse_number(
+                    sodium_mg = self._parse_number(
                         row.get('Sodium (mg)') or row.get('Sodium(mg)', 0)
                     )
-                    days[date_key]['sugar_g'] += self._parse_number(
+                    sugar_g = self._parse_number(
                         row.get('Sugars (g)') or row.get('Sugars(g)', 0)
                     )
-                    days[date_key]['fiber_g'] += self._parse_number(
+                    fiber_g = self._parse_number(
                         row.get('Fiber (g)') or row.get('Fiber(g)', 0)
                     )
+                    
+                    # Aggregate to daily totals
+                    days[date_key]['calories'] += calories
+                    days[date_key]['protein_g'] += protein_g
+                    days[date_key]['carbs_g'] += carbs_g
+                    days[date_key]['fat_g'] += fat_g
+                    days[date_key]['sodium_mg'] += sodium_mg
+                    days[date_key]['sugar_g'] += sugar_g
+                    days[date_key]['fiber_g'] += fiber_g
+                    
+                    # Capture individual food entry if requested
+                    if extract_foods:
+                        food_name = row.get('Name', '').strip()
+                        quantity = row.get('Quantity', '').strip()
+                        
+                        if food_name:  # Only add if food has a name
+                            food_entry = {
+                                'date': date_key,
+                                'food_name': food_name,
+                                'quantity': quantity,
+                                'calories': calories,
+                                'protein_g': protein_g,
+                                'carbs_g': carbs_g,
+                                'fat_g': fat_g,
+                                'sodium_mg': sodium_mg,
+                                'sugar_g': sugar_g,
+                                'fiber_g': fiber_g,
+                            }
+                            food_entries.append(food_entry)
+                    
                 except Exception as e:
                     print(f"Warning: Error parsing nutrition data for {date_key}: {e}")
             
@@ -91,8 +124,12 @@ class LoseItCSVParser:
         # Convert to list and sort by date
         result = sorted(days.values(), key=lambda x: x['date'])
         
-        print(f"✓ Parsed {len(result)} days of nutrition data")
-        return result
+        if extract_foods:
+            print(f"✓ Parsed {len(result)} days of nutrition data and {len(food_entries)} food entries")
+            return result, food_entries
+        else:
+            print(f"✓ Parsed {len(result)} days of nutrition data")
+            return result, []
     
     def _parse_number(self, value) -> float:
         """Safely parse a numeric value."""
@@ -107,22 +144,25 @@ class LoseItCSVParser:
         except (ValueError, TypeError):
             return 0.0
     
-    def parse_multiple_csvs(self, csv_files: List[bytes]) -> List[Dict]:
+    def parse_multiple_csvs(self, csv_files: List[bytes], extract_foods: bool = False) -> tuple:
         """
         Parse multiple CSV files and combine data.
         
         Args:
             csv_files: List of CSV file contents as bytes
+            extract_foods: If True, also return individual food entries
             
         Returns:
-            Combined and deduplicated daily nutrition data
+            (daily_nutrition_data, food_entries)
         """
         all_data = {}
+        all_foods = []
         
         for csv_data in csv_files:
-            parsed = self.parse_csv(csv_data)
+            parsed, foods = self.parse_csv(csv_data, extract_foods=extract_foods)
+            all_foods.extend(foods)
             
-            # Merge data by date (later data overwrites earlier)
+            # Merge daily data by date (later data overwrites earlier)
             for entry in parsed:
                 date_key = entry['date']
                 if date_key in all_data:
@@ -142,5 +182,9 @@ class LoseItCSVParser:
         # Convert to sorted list
         result = sorted(all_data.values(), key=lambda x: x['date'])
         
-        print(f"✓ Combined into {len(result)} unique days")
-        return result
+        if extract_foods:
+            print(f"✓ Combined into {len(result)} unique days and {len(all_foods)} food entries")
+        else:
+            print(f"✓ Combined into {len(result)} unique days")
+        
+        return result, all_foods
