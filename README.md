@@ -8,7 +8,13 @@ Inspired by [fitbit-grafana](https://github.com/arpanghosh8453/fitbit-grafana).
 
 - 📧 **Automatic Gmail Integration** - Fetches CSV attachments from "Lose It! Weekly Summary" emails
 - 📊 **InfluxDB Storage** - Time-series database optimized for health metrics
-- 📈 **Grafana Dashboards** - Beautiful visualizations of weight, calories, macronutrients, and more
+- 📈 **Grafana Dashboards** - Beautiful visualizations including:
+  - Weight trends
+  - Daily calories
+  - Macronutrients (protein, carbs, fat)
+  - Sugar & fiber intake
+  - Sodium tracking with alert thresholds
+  - Weight vs Calories correlation (shows diet impact on weight)
 - 🤖 **AI Chat Interface** - Ask questions about your health data using local Ollama
 - 🔄 **Easy Sync** - One command to update all your data
 
