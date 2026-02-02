@@ -133,10 +133,14 @@ class HealthDatabase:
         if not self.client:
             raise RuntimeError("Database not connected. Call connect() first.")
         
+        # Format timestamps for InfluxDB (RFC3339 format with Z)
+        start_str = start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end_str = end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+        
         query = f"""
         SELECT * FROM daily_nutrition 
-        WHERE time >= '{start_date.isoformat()}' 
-        AND time <= '{end_date.isoformat()}'
+        WHERE time >= '{start_str}' 
+        AND time <= '{end_str}'
         ORDER BY time ASC
         """
         
