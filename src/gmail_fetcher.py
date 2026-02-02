@@ -62,9 +62,28 @@ class GmailFetcher:
                 
                 # Use appropriate auth flow
                 if headless:
-                    print("\nRunning in headless mode...")
-                    print("Please visit this URL to authorize the application:\n")
-                    creds = flow.run_console()
+                    # Manual console flow for headless environments
+                    auth_url, _ = flow.authorization_url(prompt='consent')
+                    print("\n" + "="*60)
+                    print("HEADLESS AUTHENTICATION")
+                    print("="*60)
+                    print("\nPlease visit this URL in a browser (can be on another device):\n")
+                    print(auth_url)
+                    print("\nAfter authorizing, you'll be redirected to a URL.")
+                    print("Copy the ENTIRE redirect URL and paste it below.\n")
+                    
+                    code = input("Paste the full redirect URL here: ").strip()
+                    
+                    # Extract code from URL if full URL was pasted
+                    if code.startswith('http'):
+                        from urllib.parse import urlparse, parse_qs
+                        parsed = urlparse(code)
+                        code = parse_qs(parsed.query).get('code', [None])[0]
+                        if not code:
+                            raise ValueError("Could not extract authorization code from URL")
+                    
+                    flow.fetch_token(code=code)
+                    creds = flow.credentials
                 else:
                     creds = flow.run_local_server(port=0)
             
