@@ -30,13 +30,36 @@ class HealthChatbot:
         start_date = end_date - timedelta(days=days)
         return self.db.query_date_range(start_date, end_date)
     
+    def query_top_foods(self, days: int = 30, limit: int = 20) -> List[Dict]:
+        """Query most frequently eaten foods."""
+        return self.db.query_top_foods(limit=limit, days=days)
+    
+    def query_recent_foods(self, days: int = 7) -> List[Dict]:
+        """Query recent food entries."""
+        if not self.db.client:
+            return []
+        
+        query = f"""
+        SELECT * FROM food_entries 
+        WHERE time > now() - {days}d
+        ORDER BY time DESC
+        LIMIT 100
+        """
+        
+        try:
+            result = self.db.client.query(query)
+            return list(result.get_points())
+        except Exception as e:
+            print(f"Error querying recent foods: {e}")
+            return []
+    
     def query_date_range(self, start: str, end: str) -> List[Dict]:
         """Query data for specific date range."""
         start_date = datetime.fromisoformat(start)
         end_date = datetime.fromisoformat(end)
         return self.db.query_date_range(start_date, end_date)
     
-    def format_data_summary(self, data: List[Dict]) -> str:
+    def format_data_summary(self, data: List[Dict], top_foods: List[Dict] = None) -> str:
         """Create a human-readable summary of nutrition data."""
         if not data:
             return "No data available for this period."
@@ -63,20 +86,41 @@ Average Daily Intake:
   • Carbs: {avg_carbs:.1f}g
   • Fat: {avg_fat:.1f}g{weight_summary}
 """
+        
+        # Add top foods if available
+        if top_foods:
+            summary += "\n\nTop Foods (by frequency):"
+            for i, food in enumerate(top_foods[:10], 1):
+                name = food.get('food_name', 'Unknown')
+                count = food.get('count', 0)
+                avg_cal = food.get('avg_calories', 0)
+                summary += f"\n  {i}. {name} ({count}x, ~{avg_cal:.0f} cal avg)"
+        
         return summary
     
-    def chat_with_ollama(self, user_message: str, context_data: List[Dict]) -> str:
+    def chat_with_ollama(self, user_message: str, context_data: List[Dict], top_foods: List[Dict] = None, recent_foods: List[Dict] = None) -> str:
         """Send message to Ollama with health data context."""
         # Prepare data context
-        data_summary = self.format_data_summary(context_data)
+        data_summary = self.format_data_summary(context_data, top_foods)
+        
+        # Add recent foods context if asking about specific meals
+        recent_foods_text = ""
+        if recent_foods and any(word in user_message.lower() for word in ['yesterday', 'today', 'ate', 'food', 'meal', 'eat']):
+            recent_foods_text = "\n\nRecent Foods (last 7 days):"
+            for food in recent_foods[:30]:  # Show up to 30 most recent
+                time = food.get('time', '')[:10]
+                name = food.get('food_name', 'Unknown')
+                qty = food.get('quantity', '')
+                cal = food.get('calories', 0)
+                recent_foods_text += f"\n  - {time}: {name} ({qty}) - {cal:.0f} cal"
         
         # Build system prompt
         system_prompt = f"""You are a health and nutrition analyst. You help users understand their nutrition and weight data from the Lose It! app.
 
 Current data context:
-{data_summary}
+{data_summary}{recent_foods_text}
 
-Provide helpful insights, identify trends, and answer questions about the data. Be concise but informative."""
+Provide helpful insights, identify trends, and answer questions about the data. Be concise but informative. When asked about specific foods eaten, refer to the Recent Foods list above."""
         
         # Call Ollama API
         try:
@@ -129,6 +173,16 @@ Provide helpful insights, identify trends, and answer questions about the data. 
             return
         
         print(f"✓ Loaded {len(context_data)} days of data")
+        
+        # Load food data
+        print("Loading your food entries...")
+        top_foods = self.query_top_foods(days=30, limit=20)
+        recent_foods = self.query_recent_foods(days=7)
+        
+        if top_foods:
+            print(f"✓ Loaded {len(top_foods)} top foods")
+        if recent_foods:
+            print(f"✓ Loaded {len(recent_foods)} recent food entries")
         print()
         print("Type your questions about your health data.")
         print("Commands: 'quit' to exit, 'summary' for data overview")
@@ -147,13 +201,13 @@ Provide helpful insights, identify trends, and answer questions about the data. 
                     break
                 
                 if user_input.lower() == 'summary':
-                    print("\n" + self.format_data_summary(context_data))
+                    print("\n" + self.format_data_summary(context_data, top_foods))
                     print()
                     continue
                 
                 # Get AI response
                 print("\nAnalyzing... ", end='', flush=True)
-                response = self.chat_with_ollama(user_input, context_data)
+                response = self.chat_with_ollama(user_input, context_data, top_foods, recent_foods)
                 print("\r" + " " * 20 + "\r", end='')  # Clear "Analyzing..."
                 
                 print(f"AI: {response}")
