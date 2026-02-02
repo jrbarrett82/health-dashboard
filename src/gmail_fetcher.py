@@ -25,8 +25,12 @@ class GmailFetcher:
         self.token_file = os.getenv('GMAIL_TOKEN_FILE', 'token.json')
         self.service = None
         
-    def authenticate(self):
-        """Authenticate with Gmail API using OAuth2."""
+    def authenticate(self, headless: bool = None):
+        """Authenticate with Gmail API using OAuth2.
+        
+        Args:
+            headless: If True, use console-based auth. If None, auto-detect.
+        """
         creds = None
         
         # Load existing token
@@ -46,7 +50,23 @@ class GmailFetcher:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     self.credentials_file, SCOPES
                 )
-                creds = flow.run_local_server(port=0)
+                
+                # Auto-detect headless if not specified
+                if headless is None:
+                    import webbrowser
+                    try:
+                        webbrowser.get()
+                        headless = False
+                    except webbrowser.Error:
+                        headless = True
+                
+                # Use appropriate auth flow
+                if headless:
+                    print("\nRunning in headless mode...")
+                    print("Please visit this URL to authorize the application:\n")
+                    creds = flow.run_console()
+                else:
+                    creds = flow.run_local_server(port=0)
             
             # Save credentials for next run
             with open(self.token_file, 'w') as token:
