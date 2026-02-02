@@ -63,7 +63,12 @@ class GmailFetcher:
                 # Use appropriate auth flow
                 if headless:
                     # Manual console flow for headless environments
-                    auth_url, _ = flow.authorization_url(prompt='consent')
+                    flow.redirect_uri = "http://localhost"
+                    auth_url, _ = flow.authorization_url(
+                        prompt='consent',
+                        access_type='offline',
+                        include_granted_scopes='true'
+                    )
                     print("\n" + "="*60)
                     print("HEADLESS AUTHENTICATION")
                     print("="*60)
