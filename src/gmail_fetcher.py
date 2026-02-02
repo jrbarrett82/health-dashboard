@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Allow Google to return expanded scopes (required for Gmail API)
+os.environ.setdefault('OAUTHLIB_RELAX_TOKEN_SCOPE', '1')
+
 # Gmail API scopes
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 

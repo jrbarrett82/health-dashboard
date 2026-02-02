@@ -4,6 +4,10 @@ venv/
 env/
 .env
 
+# OAuth credentials (DO NOT COMMIT)
+credentials.json
+token.json
+
 # Build outputs
 dist/
 build/
