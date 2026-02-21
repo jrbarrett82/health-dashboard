@@ -266,27 +266,29 @@ class HealthDatabase:
             raise RuntimeError("Database not connected. Call connect() first.")
         
         query = f"""
-        SELECT COUNT(calories) as count, 
+        SELECT COUNT(calories) as count,
                MEAN(calories) as avg_calories,
                MEAN(sodium_mg) as avg_sodium
-        FROM food_entries 
+        FROM food_entries
         WHERE time > now() - {days}d
-        GROUP BY food_name 
-        ORDER BY count DESC 
-        LIMIT {limit}
+        GROUP BY food_name
         """
-        
+
         try:
             result = self.client.query(query)
             foods = []
-            for point in result.get_points():
-                foods.append({
-                    'food_name': point.get('food_name'),
-                    'count': int(point.get('count', 0)),
-                    'avg_calories': round(point.get('avg_calories', 0), 1),
-                    'avg_sodium': round(point.get('avg_sodium', 0), 1)
-                })
-            return foods
+            for key, points in result.items():
+                tags = key[1] if key[1] else {}
+                food_name = tags.get('food_name', 'Unknown')
+                for point in points:
+                    foods.append({
+                        'food_name': food_name,
+                        'count': int(point.get('count', 0)),
+                        'avg_calories': round(point.get('avg_calories', 0), 1),
+                        'avg_sodium': round(point.get('avg_sodium', 0), 1)
+                    })
+            foods.sort(key=lambda x: x['count'], reverse=True)
+            return foods[:limit]
         except Exception as e:
             print(f"Error querying top foods: {e}")
             return []
