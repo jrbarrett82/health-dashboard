@@ -37,7 +37,7 @@ class GmailFetcher:
         creds = None
         
         # Load existing token
-        if os.path.exists(self.token_file):
+        if os.path.exists(self.token_file) and os.path.getsize(self.token_file) > 0:
             creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
         
         # Refresh or create new credentials
